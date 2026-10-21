@@ -595,9 +595,13 @@ void VROARSessioniOS::setCloudAnchorProvider(VROCloudAnchorProvider provider) {
       if ([VROCloudAnchorProviderARCore isAvailable]) {
         _cloudAnchorProviderARCore = [[VROCloudAnchorProviderARCore alloc] init];
         if (_cloudAnchorProviderARCore) {
+          if (!_cloudAnchorAuthToken.empty()) {
+            NSString *authToken = [NSString stringWithUTF8String:_cloudAnchorAuthToken.c_str()];
+            [_cloudAnchorProviderARCore setAuthToken:authToken];
+          }
           pinfo("ARCore Cloud Anchor provider initialized successfully");
         } else {
-          pwarn("Failed to initialize ARCore Cloud Anchor provider. Check GARAPIKey in Info.plist.");
+          pwarn("Failed to initialize ARCore Cloud Anchor provider.");
         }
       } else {
         pwarn("ARCore SDK not available. Add ARCore/CloudAnchors pod to enable cloud anchors.");
@@ -660,6 +664,33 @@ void VROARSessioniOS::setCloudAnchorProvider(VROCloudAnchorProvider provider) {
       _cloudAnchorProviderRV = nil;
     }
   }
+}
+
+bool VROARSessioniOS::setCloudAnchorAuthToken(std::string authToken) {
+  if (authToken.empty()) {
+    pwarn("Cannot set an empty ARCore cloud anchor auth token");
+    return false;
+  }
+
+  _cloudAnchorAuthToken = authToken;
+
+  // Token delivery may happen before the React prop selecting the provider is
+  // applied. Initialize the provider here so either call order is supported.
+  if (_cloudAnchorProviderARCore == nil) {
+    if (![VROCloudAnchorProviderARCore isAvailable]) {
+      pwarn("Cannot set ARCore auth token because the ARCore SDK is unavailable");
+      return false;
+    }
+    _cloudAnchorProviderARCore = [[VROCloudAnchorProviderARCore alloc] init];
+  }
+
+  if (_cloudAnchorProviderARCore == nil) {
+    pwarn("Cannot set ARCore auth token because the provider failed to initialize");
+    return false;
+  }
+
+  NSString *nativeToken = [NSString stringWithUTF8String:authToken.c_str()];
+  return [_cloudAnchorProviderARCore setAuthToken:nativeToken];
 }
 
 void VROARSessioniOS::addAnchor(std::shared_ptr<VROARAnchor> anchor) {
