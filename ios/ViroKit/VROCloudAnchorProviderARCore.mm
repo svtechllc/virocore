@@ -68,21 +68,20 @@
 
         pinfo("[ViroAR] Initializing ARCore Cloud Anchors provider...");
 
-        // Get API key from Info.plist
+        // Prefer the existing API-key flow when GARAPIKey is configured. When it
+        // is absent, create a keyless session and wait for a signed JWT supplied
+        // by the host application through setAuthToken:.
         NSString *apiKey = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"GARAPIKey"];
-        if (!apiKey || apiKey.length == 0) {
-            pwarn("[ViroAR] GARAPIKey not found in Info.plist. Cloud anchors require a Google Cloud API key.");
-            pwarn("[ViroAR] Add <key>GARAPIKey</key><string>YOUR_API_KEY</string> to Info.plist");
-            return nil;
+        if (apiKey.length > 0) {
+            pinfo("[ViroAR] Initializing GARSession with API-key authentication");
+            // bundleIdentifier:nil uses the app's main bundle identifier.
+            _garSession = [GARSession sessionWithAPIKey:apiKey
+                                       bundleIdentifier:nil
+                                                  error:&error];
+        } else {
+            pinfo("[ViroAR] Initializing GARSession with keyless authentication");
+            _garSession = [GARSession sessionWithError:&error];
         }
-
-        pinfo("[ViroAR] GARAPIKey found (length: %lu)", (unsigned long)apiKey.length);
-
-        // Initialize GARSession with API key
-        // bundleIdentifier:nil uses the app's main bundle identifier
-        _garSession = [GARSession sessionWithAPIKey:apiKey
-                                   bundleIdentifier:nil
-                                              error:&error];
         if (error || !_garSession) {
             pwarn("[ViroAR] Failed to create GARSession: %s",
                    error ? [[error localizedDescription] UTF8String] : "Unknown error");
@@ -108,6 +107,33 @@
         pinfo("[ViroAR] ARCore Cloud Anchors initialized successfully - ready for hosting/resolving");
     }
     return self;
+}
+
+- (BOOL)setAuthToken:(NSString *)authToken {
+    if (!_garSession || authToken.length == 0) {
+        pwarn("[ViroAR] Cannot set an empty ARCore auth token or use it before GARSession initialization");
+        return NO;
+    }
+
+    // Compact RS256 JWTs contain only base64url characters and two separators.
+    // Rejecting everything else also prevents accidental `Bearer ` prefixes,
+    // whitespace, and newline characters from reaching GARSession.
+    static NSCharacterSet *invalidTokenCharacters;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSCharacterSet *allowed = [NSCharacterSet characterSetWithCharactersInString:
+            @"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_."];
+        invalidTokenCharacters = [allowed invertedSet];
+    });
+
+    if ([authToken rangeOfCharacterFromSet:invalidTokenCharacters].location != NSNotFound) {
+        pwarn("[ViroAR] ARCore auth token must be a compact JWT without a Bearer prefix or whitespace");
+        return NO;
+    }
+
+    [_garSession setAuthToken:authToken];
+    pinfo("[ViroAR] ARCore keyless auth token updated");
+    return YES;
 }
 
 - (void)hostAnchor:(ARAnchor *)anchor
@@ -921,6 +947,11 @@
 - (nullable instancetype)init {
     pwarn("[ViroAR] ARCore SDK not available. Cloud anchors require ARCore/CloudAnchors pod.");
     return nil;
+}
+
+- (BOOL)setAuthToken:(NSString *)authToken {
+    pwarn("[ViroAR] Cannot set auth token because the ARCore SDK is unavailable");
+    return NO;
 }
 
 - (void)hostAnchor:(ARAnchor *)anchor
