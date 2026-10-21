@@ -1,0 +1,66 @@
+name: Build iOS ViroKit (keyless ARCore)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - arcore-ios-keyless-auth
+    paths:
+      - "ViroRenderer/**"
+      - "ios/**"
+      - ".github/workflows/build-ios-keyless.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: virokit-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ios-device-framework:
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out ViroCore
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 16.4
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "16.4"
+
+      - name: Install CocoaPods dependencies
+        working-directory: ios
+        run: pod install --verbose
+
+      - name: Build ViroKit for physical iOS devices
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -workspace ViroRenderer.xcworkspace \
+            -scheme ViroKit \
+            -sdk iphoneos \
+            -configuration Release \
+            -derivedDataPath "$RUNNER_TEMP/viro-derived-data" \
+            IPHONEOS_DEPLOYMENT_TARGET=13.0 \
+            CODE_SIGNING_ALLOWED=NO \
+            BUILD_LIBRARY_FOR_DISTRIBUTION=YES
+
+      - name: Package ViroKit framework
+        run: |
+          FRAMEWORK="$RUNNER_TEMP/viro-derived-data/Build/Products/Release-iphoneos/ViroKit.framework"
+          test -f "$FRAMEWORK/ViroKit"
+          tar -czf "$RUNNER_TEMP/ViroKit-ios-keyless.tgz" \
+            -C "$(dirname "$FRAMEWORK")" \
+            "$(basename "$FRAMEWORK")"
+
+      - name: Upload ViroKit framework
+        uses: actions/upload-artifact@v4
+        with:
+          name: ViroKit-ios-keyless-${{ github.sha }}
+          path: ${{ runner.temp }}/ViroKit-ios-keyless.tgz
+          if-no-files-found: error
+          retention-days: 14
