@@ -33,7 +33,9 @@ jobs:
 
       - name: Install CocoaPods dependencies
         working-directory: ios
-        run: pod install --verbose
+        # Refresh ARCore explicitly because Podfile.lock may contain the SDK
+        # version used by an earlier framework artifact.
+        run: pod update ARCore --repo-update --verbose
 
       - name: Build ViroKit for physical iOS devices
         working-directory: ios

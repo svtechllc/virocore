@@ -10,9 +10,9 @@ Pod::Spec.new do |s|
     To enable Cloud Anchors, Geospatial, or Scene Semantics features:
 
     1. Add ARCore pods to your Podfile:
-       pod 'ARCore/CloudAnchors', '~> 1.51.0'  # For Cloud Anchors
-       pod 'ARCore/Geospatial', '~> 1.51.0'    # For Geospatial API
-       pod 'ARCore/Semantics', '~> 1.51.0'     # For Scene Semantics
+       pod 'ARCore/CloudAnchors', '~> 1.57.0'  # For Cloud Anchors
+       pod 'ARCore/Geospatial', '~> 1.57.0'    # For Geospatial API
+       pod 'ARCore/Semantics', '~> 1.57.0'     # For Scene Semantics
 
     2. Add the ViroKit weak linking post_install hook to your Podfile.
        See: https://github.com/ReactVision/viro#arcore-setup

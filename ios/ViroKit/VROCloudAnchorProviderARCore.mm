@@ -727,7 +727,7 @@
 
 + (BOOL)isGeospatialAvailable {
     pwarn("[ViroAR] ARCore Geospatial SDK is NOT available (ARCORE_GEOSPATIAL_AVAILABLE=0)");
-    pwarn("[ViroAR] To enable Geospatial, add to your Podfile: pod 'ARCore/Geospatial', '~> 1.51.0'");
+    pwarn("[ViroAR] To enable Geospatial, add to your Podfile: pod 'ARCore/Geospatial', '~> 1.57.0'");
     return NO;
 }
 
@@ -898,7 +898,7 @@
 
 + (BOOL)isSemanticsAvailable {
     pwarn("[ViroAR] ARCore Semantics SDK is NOT available (ARCORE_SEMANTICS_AVAILABLE=0)");
-    pwarn("[ViroAR] To enable Semantics, add to your Podfile: pod 'ARCore/Semantics', '~> 1.51.0'");
+    pwarn("[ViroAR] To enable Semantics, add to your Podfile: pod 'ARCore/Semantics', '~> 1.57.0'");
     return NO;
 }
 
@@ -907,7 +907,7 @@
 }
 
 - (void)setSemanticModeEnabled:(BOOL)enabled {
-    pwarn("[ViroAR] Scene Semantics requires ARCore/Semantics pod. Add to your Podfile: pod 'ARCore/Semantics', '~> 1.51.0'");
+    pwarn("[ViroAR] Scene Semantics requires ARCore/Semantics pod. Add to your Podfile: pod 'ARCore/Semantics', '~> 1.57.0'");
 }
 
 - (CVPixelBufferRef _Nullable)getSemanticImage {
@@ -932,7 +932,7 @@
 
 + (BOOL)isAvailable {
     pwarn("[ViroAR] ARCore SDK is NOT available (ARCORE_AVAILABLE=0)");
-    pwarn("[ViroAR] To enable Cloud Anchors, add to your Podfile: pod 'ARCore/CloudAnchors', '~> 1.51.0'");
+    pwarn("[ViroAR] To enable Cloud Anchors, add to your Podfile: pod 'ARCore/CloudAnchors', '~> 1.57.0'");
     return NO;
 }
 
