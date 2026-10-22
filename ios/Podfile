@@ -9,9 +9,9 @@ def common_pods
     # These are OPTIONAL - ViroKit is built with weak linking so apps can
     # choose whether to include ARCore pods based on their needs.
     # Requires Google Cloud API key in Info.plist when used.
-    pod 'ARCore/CloudAnchors', '~> 1.57.0'
-    pod 'ARCore/Geospatial', '~> 1.57.0'
-    pod 'ARCore/Semantics', '~> 1.57.0'
+    pod 'ARCore/CloudAnchors', '~> 1.56.0'
+    pod 'ARCore/Geospatial', '~> 1.56.0'
+    pod 'ARCore/Semantics', '~> 1.56.0'
 end
 
 target 'ViroSample' do
