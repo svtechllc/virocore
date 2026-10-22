@@ -57,6 +57,20 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             BUILD_LIBRARY_FOR_DISTRIBUTION=YES
 
+      - name: Verify ViroKit is self-contained
+        run: |
+          FRAMEWORK="$RUNNER_TEMP/viro-derived-data/Build/Products/Release-iphoneos/ViroKit.framework"
+          echo "Dynamic framework dependencies:"
+          otool -L "$FRAMEWORK/ViroKit"
+          if otool -L "$FRAMEWORK/ViroKit" | grep -E '@rpath/(nanopb|Firebase|Google|GTM|FBLPromises)'; then
+            echo "error: ViroKit still references an unbundled CocoaPods framework"
+            exit 1
+          fi
+          if nm -u "$FRAMEWORK/ViroKit" | grep -E '(_pb_decode|_pb_encode)'; then
+            echo "error: ViroKit still has unresolved nanopb symbols"
+            exit 1
+          fi
+
       - name: Package ViroKit framework
         run: |
           FRAMEWORK="$RUNNER_TEMP/viro-derived-data/Build/Products/Release-iphoneos/ViroKit.framework"
