@@ -35,7 +35,13 @@ jobs:
         working-directory: ios
         # Refresh ARCore explicitly because Podfile.lock may contain the SDK
         # version used by an earlier framework artifact.
-        run: pod update ARCore --repo-update --verbose
+        run: >-
+          pod update
+          ARCore/CloudAnchors
+          ARCore/Geospatial
+          ARCore/Semantics
+          --repo-update
+          --verbose
 
       - name: Build ViroKit for physical iOS devices
         working-directory: ios
