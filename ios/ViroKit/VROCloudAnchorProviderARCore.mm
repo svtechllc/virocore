@@ -271,22 +271,13 @@
     // Store the current GARFrame for geospatial queries
     _currentGARFrame = garFrame;
 
-    // Clean up completed futures
-    NSMutableArray<GARHostCloudAnchorFuture *> *completedHostFutures = [NSMutableArray new];
-    for (GARHostCloudAnchorFuture *future in _hostFutures) {
-        if (future.state == GARFutureStateDone) {
-            [completedHostFutures addObject:future];
-        }
-    }
-    [_hostFutures removeObjectsInArray:completedHostFutures];
-
-    NSMutableArray<GARResolveCloudAnchorFuture *> *completedResolveFutures = [NSMutableArray new];
-    for (GARResolveCloudAnchorFuture *future in _resolveFutures) {
-        if (future.state == GARFutureStateDone) {
-            [completedResolveFutures addObject:future];
-        }
-    }
-    [_resolveFutures removeObjectsInArray:completedResolveFutures];
+    // Keep futures alive until cancelAllOperations tears down this provider.
+    // GARFuture transitions to Done before its completion handler is dispatched
+    // on the main thread. Removing the last strong reference here can release a
+    // completed future in that gap and prevent its callback from reaching the
+    // React Native promise. A Cloud Anchor session supports at most 40 active
+    // operations, so retaining completed handles for the session lifetime is
+    // both bounded and safer than frame-loop cleanup.
 }
 
 - (NSString *)errorMessageForState:(GARCloudAnchorState)state {
