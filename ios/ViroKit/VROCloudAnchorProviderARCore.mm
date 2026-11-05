@@ -39,6 +39,8 @@
 @property (nonatomic, assign) BOOL geospatialModeEnabled;
 @property (nonatomic, strong) GARFrame *currentGARFrame;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, GARAnchor *> *geospatialAnchors;
+- (void)pruneCompletedHostFutures;
+- (void)pruneCompletedResolveFutures;
 @end
 
 @implementation VROCloudAnchorProviderARCore
@@ -136,6 +138,30 @@
     return YES;
 }
 
+- (void)pruneCompletedHostFutures {
+    @synchronized (_hostFutures) {
+        NSIndexSet *completed = [_hostFutures indexesOfObjectsPassingTest:
+            ^BOOL(GARHostCloudAnchorFuture *future, NSUInteger idx, BOOL *stop) {
+                return future.state == GARFutureStateDone;
+            }];
+        if (completed.count > 0) {
+            [_hostFutures removeObjectsAtIndexes:completed];
+        }
+    }
+}
+
+- (void)pruneCompletedResolveFutures {
+    @synchronized (_resolveFutures) {
+        NSIndexSet *completed = [_resolveFutures indexesOfObjectsPassingTest:
+            ^BOOL(GARResolveCloudAnchorFuture *future, NSUInteger idx, BOOL *stop) {
+                return future.state == GARFutureStateDone;
+            }];
+        if (completed.count > 0) {
+            [_resolveFutures removeObjectsAtIndexes:completed];
+        }
+    }
+}
+
 - (void)hostAnchor:(ARAnchor *)anchor
            ttlDays:(NSInteger)ttlDays
          onSuccess:(void (^)(NSString *cloudAnchorId, ARAnchor *resolvedAnchor))onSuccess
@@ -155,6 +181,11 @@
                                                             TTLDays:ttlDays
                                                   completionHandler:^(NSString * _Nullable cloudAnchorId,
                                                                       GARCloudAnchorState cloudState) {
+        // Defer cleanup until this callback returns, so releasing a future
+        // cannot release the block while it is executing.
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self pruneCompletedHostFutures];
+        });
         if (cloudState == GARCloudAnchorStateSuccess && cloudAnchorId) {
             pinfo("Cloud anchor hosted successfully: %s", [cloudAnchorId UTF8String]);
             if (onSuccess) {
@@ -182,7 +213,9 @@
     }
 
     // Keep a reference to the future
-    [_hostFutures addObject:future];
+    @synchronized (_hostFutures) {
+        [_hostFutures addObject:future];
+    }
     pinfo("Cloud anchor hosting started");
 }
 
@@ -203,6 +236,12 @@
     GARResolveCloudAnchorFuture *future = [_garSession resolveCloudAnchorWithIdentifier:cloudAnchorId
                                                                       completionHandler:^(GARAnchor * _Nullable anchor,
                                                                                           GARCloudAnchorState cloudState) {
+        // Frame-loop cleanup can release a Done future before this callback is
+        // dispatched. Defer cleanup until this callback returns instead; this
+        // also allows another resolve to start later in the same session.
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self pruneCompletedResolveFutures];
+        });
         if (cloudState == GARCloudAnchorStateSuccess && anchor) {
             pinfo("Cloud anchor resolved successfully: %s", [cloudAnchorId UTF8String]);
             if (onSuccess) {
@@ -230,22 +269,28 @@
     }
 
     // Keep a reference to the future
-    [_resolveFutures addObject:future];
+    @synchronized (_resolveFutures) {
+        [_resolveFutures addObject:future];
+    }
     pinfo("Cloud anchor resolve started for: %s", [cloudAnchorId UTF8String]);
 }
 
 - (void)cancelAllOperations {
     // Cancel all pending host operations
-    for (GARHostCloudAnchorFuture *future in _hostFutures) {
-        [future cancel];
+    @synchronized (_hostFutures) {
+        for (GARHostCloudAnchorFuture *future in _hostFutures) {
+            [future cancel];
+        }
+        [_hostFutures removeAllObjects];
     }
-    [_hostFutures removeAllObjects];
 
     // Cancel all pending resolve operations
-    for (GARResolveCloudAnchorFuture *future in _resolveFutures) {
-        [future cancel];
+    @synchronized (_resolveFutures) {
+        for (GARResolveCloudAnchorFuture *future in _resolveFutures) {
+            [future cancel];
+        }
+        [_resolveFutures removeAllObjects];
     }
-    [_resolveFutures removeAllObjects];
 
     pinfo("All cloud anchor operations cancelled");
 }
@@ -271,13 +316,9 @@
     // Store the current GARFrame for geospatial queries
     _currentGARFrame = garFrame;
 
-    // Keep futures alive until cancelAllOperations tears down this provider.
-    // GARFuture transitions to Done before its completion handler is dispatched
-    // on the main thread. Removing the last strong reference here can release a
-    // completed future in that gap and prevent its callback from reaching the
-    // React Native promise. A Cloud Anchor session supports at most 40 active
-    // operations, so retaining completed handles for the session lifetime is
-    // both bounded and safer than frame-loop cleanup.
+    // Futures are pruned from their completion handlers. GARFuture transitions
+    // to Done before callback dispatch, so frame-loop cleanup here would race
+    // and could release the final strong reference before the callback runs.
 }
 
 - (NSString *)errorMessageForState:(GARCloudAnchorState)state {
